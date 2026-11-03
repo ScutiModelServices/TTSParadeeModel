@@ -12,11 +12,12 @@ from __future__ import annotations
 import asyncio
 import io
 import os
+import re
 import threading
 import uuid
 import wave
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, AsyncIterator, Callable, Iterator
 
 DEFAULT_VERSION = "1.2"
 MODEL_FILE = "onnx/paradee_int8.onnx"
@@ -42,9 +43,20 @@ def repo_of(version: str) -> str:
 class Voices:
     """A loaded Paradee model that turns text into a WAV file."""
 
+    rate = SAMPLE_RATE
+
     def __init__(self, tts: Any) -> None:
         self._tts = tts
         self.names: list[str] = list(tts.voices)
+
+    def pieces(self, text: str, voice: str, speed: float) -> Iterator[bytes]:
+        """16-bit mono audio, one piece per sentence, made as the caller asks for the next one."""
+        import numpy
+
+        for sentence in re.split(r"(?<=[.!?])\s+", text.strip()):
+            audio = self._tts(sentence, speed=speed, voice=voice) if sentence else []
+            if len(audio):
+                yield (numpy.clip(audio, -1.0, 1.0) * 32767).astype("<i2").tobytes()
 
     def speak(self, text: str, voice: str, speed: float) -> tuple[bytes, float]:
         import numpy
@@ -115,6 +127,7 @@ class ParadeeEngine:
         self._loaded: Voices | None = None
         self._load_lock = threading.Lock()
         self._gate = asyncio.Semaphore(1)
+        self.generation = 0  # part of the answer cache key; changes whenever the loaded model is dropped
 
     @property
     def voices(self) -> list[str]:
@@ -153,13 +166,31 @@ class ParadeeEngine:
                 self._loaded = self._loader(self.version, self._threads)
             return self._loaded
 
-    async def synthesize(self, text: str, voice: str | None, speed: float) -> dict[str, Any]:
+    def _name(self, voice: str | None) -> str:
         name = voice or self.default_voice
         if name not in self.voices:
             raise EngineError(f"Voice {name!r} is not served here; the voices are {', '.join(self.voices)}", 404)
+        return name
+
+    async def synthesize(self, text: str, voice: str | None, speed: float) -> dict[str, Any]:
+        name = self._name(voice)
         async with self._gate:
             wav, seconds = await asyncio.to_thread(self._speak, text, name, speed)
         return {"wav": wav, "seconds": seconds, "voice": name}
+
+    async def stream(self, text: str, voice: str | None, speed: float) -> AsyncIterator[tuple[int, bytes]]:
+        """The audio as it is made: (sample rate, 16-bit mono PCM) per sentence. Holds the generation slot until
+        the last piece, or until the caller closes the iterator."""
+        name = self._name(voice)
+        async with self._gate:
+            loaded = await asyncio.to_thread(self._model)
+            pieces = loaded.pieces(text, name, speed)
+            made = False
+            while (piece := await asyncio.to_thread(next, pieces, None)) is not None:
+                made = True
+                yield loaded.rate, piece
+        if not made:
+            raise EngineError("No speech could be made from that text.", 422)
 
     def _speak(self, text: str, name: str, speed: float) -> tuple[bytes, float]:
         return self._model().speak(text, name, speed)
@@ -193,6 +224,7 @@ class ParadeeEngine:
     def _forget(self) -> None:
         with self._load_lock:
             self._loaded = None
+            self.generation += 1  # kept answers are from the old files or threads
 
     def _read_marker(self) -> str | None:
         try:

@@ -1,11 +1,13 @@
-"""Times one TTS service: py tools/bench.py http://127.0.0.1:9160 [--token T] [--voice V] [--runs 3] [--save DIR]
+"""Times one TTS service: py tools/bench.py http://127.0.0.1:9160 [--token T] [--voice V] [--runs 3] [--stream] [--save DIR]
 
 Sends the same sentences to /v1/speak and prints, per sentence, the wait, the audio length and how many times faster
-than real time it was. Run it against TTSPiperModel and TTSParadeeModel with the same sentences to compare them.
+than real time it was. Each run uses a slightly different speed, so the answer cache never serves it.
+With --stream it asks for the audio sentence by sentence and also prints the wait for the first audio. Run it against TTSPiperModel and TTSParadeeModel with the same sentences to compare them.
 Uses only the standard library."""
 import argparse
 import json
 import pathlib
+import random
 import time
 import urllib.request
 
@@ -22,19 +24,25 @@ def main() -> None:
     parser.add_argument("--token", default="")
     parser.add_argument("--voice", default=None)
     parser.add_argument("--runs", type=int, default=3)
+    parser.add_argument("--stream", action="store_true")
     parser.add_argument("--save", default="")
     args = parser.parse_args()
     for number, text in enumerate(SENTENCES, 1):
-        body = {"text": text, **({"voice": args.voice} if args.voice else {})}
         for run in range(1, args.runs + 1):
+            body = {"text": text, "speed": round(1 + random.random() / 100, 6), **({"voice": args.voice} if args.voice else {}),
+                    **({"stream": True} if args.stream else {})}
             request = urllib.request.Request(args.url.rstrip("/") + "/v1/speak", json.dumps(body).encode(),
                                              {"Content-Type": "application/json", "X-Internal-Token": args.token})
             started = time.perf_counter()
             with urllib.request.urlopen(request, timeout=300) as reply:
-                audio, headers = reply.read(), reply.headers
+                first = reply.read(1024)
+                first_wait = time.perf_counter() - started
+                audio, headers = first + reply.read(), reply.headers
             wait = time.perf_counter() - started
-            seconds = float(headers["X-Audio-Seconds"])
-            print(f"sentence {number} run {run}: wait {wait:.3f}s  audio {seconds:.2f}s  {seconds / wait:5.1f}x real time  voice {headers['X-Voice']}")
+            rate = int.from_bytes(audio[24:28], "little")
+            seconds = (len(audio) - 44) / 2 / rate
+            print(f"sentence {number} run {run}: wait {wait:.3f}s  audio {seconds:.2f}s  {seconds / wait:5.1f}x real time  voice {headers['X-Voice']}"
+                  + (f"  first audio after {first_wait:.3f}s" if args.stream else ""))
             if args.save and run == 1:
                 folder = pathlib.Path(args.save)
                 folder.mkdir(parents=True, exist_ok=True)

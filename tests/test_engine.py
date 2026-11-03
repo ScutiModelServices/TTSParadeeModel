@@ -81,3 +81,66 @@ def test_voices_write_a_24khz_wav_from_the_float_audio():
 
     wav, seconds = Voices(Tts()).speak("hi", "af_heart", 1.0)
     assert seconds == 0.5 and wav[:4] == b"RIFF"
+
+
+def test_voices_pieces_are_one_per_sentence_and_skip_silence():
+    import numpy
+
+    class Tts:
+        voices = ["af_heart"]
+        heard = []
+
+        def __call__(self, text, speed, voice):
+            Tts.heard.append((text, speed, voice))
+            return numpy.zeros(0 if text == "Hush." else 2400, dtype="float32")
+
+    voices = Voices(Tts())
+    pieces = list(voices.pieces("One. Two!  Hush. Three?", "af_heart", 1.5))
+    assert voices.rate == 24000 and [len(piece) for piece in pieces] == [4800] * 3
+    assert Tts.heard == [("One.", 1.5, "af_heart"), ("Two!", 1.5, "af_heart"), ("Hush.", 1.5, "af_heart"), ("Three?", 1.5, "af_heart")]
+    assert list(voices.pieces("   ", "af_heart", 1.0)) == []
+
+
+def collect(engine, text="One. Two. Three.", voice=None, speed=1.0):
+    async def run():
+        return [piece async for piece in engine.stream(text, voice, speed)]
+
+    return asyncio.run(run())
+
+
+def test_stream_gives_the_audio_sentence_by_sentence():
+    engine = make_engine()
+    pieces = collect(engine, voice="bf_isabella", speed=1.5)
+    assert [rate for rate, _ in pieces] == [24000] * 3 and all(len(data) == 4800 for _, data in pieces)
+    assert engine.made[0].calls == [{"text": "One. Two. Three.", "voice": "bf_isabella", "speed": 1.5, "stream": True}]
+
+
+def test_stream_refuses_an_unknown_voice_and_empty_audio():
+    with pytest.raises(EngineError) as unknown:
+        collect(make_engine(), voice="zz_nobody")
+    assert unknown.value.status == 404
+    with pytest.raises(EngineError) as empty:
+        collect(make_engine(), text="...")
+    assert empty.value.status == 422
+
+
+def test_closing_a_stream_early_frees_the_generation_slot():
+    async def run():
+        engine = make_engine()
+        pieces = engine.stream("One. Two. Three.", None, 1.0)
+        await anext(pieces)
+        await pieces.aclose()
+        return await asyncio.wait_for(engine.synthesize("again", None, 1.0), 2)
+
+    assert asyncio.run(run())["seconds"] == 0.5
+
+
+def test_generation_changes_when_the_loaded_model_is_dropped():
+    engine = make_engine()
+    before = engine.generation
+    engine.num_thread = 3
+    assert engine.generation == before + 1
+    engine.num_thread = 3  # no change, nothing dropped
+    assert engine.generation == before + 1
+    asyncio.run(engine.unload())
+    assert engine.generation == before + 2

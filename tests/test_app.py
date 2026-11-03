@@ -29,6 +29,72 @@ def test_speak_returns_a_wav_with_its_length_and_voice():
     assert engine.made[0].calls == [{"text": "Hello there.", "voice": "af_heart", "speed": 1.2}]
 
 
+def test_the_same_request_is_answered_from_the_cache():
+    engine = make_engine()
+    c = client(engine, cache_size=4)
+    first, second = c.post("/v1/speak", json=BODY), c.post("/v1/speak", json=BODY)
+    assert (first.headers["X-Cache"], second.headers["X-Cache"]) == ("miss", "hit")
+    assert second.content == first.content and second.headers["X-Voice"] == "af_heart"
+    assert len(engine.made[0].calls) == 1
+    c.post("/v1/speak", json={**BODY, "speed": 1.1})  # another speed is another answer
+    c.post("/v1/speak", json={**BODY, "voice": "bf_isabella"})
+    assert len(engine.made[0].calls) == 3
+
+
+def test_the_cache_keeps_only_the_newest_and_can_be_off():
+    c = client(make_engine(), cache_size=1)
+    for text in ("one", "two", "one"):
+        assert c.post("/v1/speak", json={"text": text}).headers["X-Cache"] == "miss"
+    off = client(make_engine())  # no cache_size: off
+    assert [off.post("/v1/speak", json=BODY).headers["X-Cache"] for _ in range(2)] == ["miss", "miss"]
+
+
+def test_the_cache_is_not_used_after_the_model_was_reloaded():
+    engine = make_engine()
+    c = client(engine, cache_size=4)
+    c.post("/v1/speak", json=BODY)
+    asyncio.run(engine.unload())  # new weights
+    assert c.post("/v1/speak", json=BODY).headers["X-Cache"] == "miss"
+
+
+def test_cache_size_is_a_setting_that_applies_live(tmp_path):
+    store = TokenStore(tmp_path / "t.json")
+    config = settings.Config(store.settings_path, SETTINGS)
+    config.set({"update_check_hours": 0, "warm": False})
+    c = client(make_engine(), admin_password="admin", tokens=store, config=config)
+    admin = {"X-Internal-Token": "admin"}
+    use = {"X-Internal-Token": c.post("/admin/tokens", json={"name": "t"}, headers=admin).json()["token"]}
+    assert [c.post("/v1/speak", json=BODY, headers=use).headers["X-Cache"] for _ in range(2)] == ["miss", "hit"]
+    assert c.put("/admin/settings", json={"values": {"cache_size": 0}}, headers=admin).status_code == 200
+    assert c.post("/v1/speak", json=BODY, headers=use).headers["X-Cache"] == "miss"
+
+
+def test_stream_sends_a_wav_without_a_length_and_the_audio_sentence_by_sentence():
+    reply = client().post("/v1/speak", json={"text": "One. Two. Three.", "stream": True})
+    assert reply.status_code == 200 and reply.headers["content-type"] == "audio/wav" and reply.headers["X-Voice"] == "af_heart"
+    assert reply.content[:4] == b"RIFF" and int.from_bytes(reply.content[24:28], "little") == 24000
+    assert len(reply.content[44:]) == 3 * 4800
+    assert reply.content[4:8] == b"\xff\xff\xff\xff" and reply.content[40:44] == b"\xff\xff\xff\xff"  # length unknown
+
+
+def test_stream_errors_are_still_http_errors():
+    c = client()
+    assert c.post("/v1/speak", json={**BODY, "voice": "zz_nobody", "stream": True}).status_code == 404
+    assert c.post("/v1/speak", json={"text": "...", "stream": True}).status_code == 422
+
+
+def test_a_finished_stream_fills_the_cache_with_a_complete_wav():
+    engine = make_engine()
+    c = client(engine, cache_size=4)
+    text = {"text": "One. Two.", "stream": True}
+    streamed = c.post("/v1/speak", json=text)
+    kept = c.post("/v1/speak", json=text)
+    assert (streamed.headers["X-Cache"], kept.headers["X-Cache"]) == ("miss", "hit")
+    assert int.from_bytes(kept.content[40:44], "little") == 2 * 4800 and kept.content[44:] == streamed.content[44:]
+    assert float(kept.headers["X-Audio-Seconds"]) == 0.2
+    assert len(engine.made[0].calls) == 1
+
+
 def test_request_is_validated():
     c = client()
     assert c.post("/v1/speak", json={"text": ""}).status_code == 422
@@ -48,7 +114,7 @@ def test_unknown_voice_is_404_and_a_crash_is_500():
         async def close(self):
             pass
 
-        model, num_thread, ready, voices, default_voice = "m", None, False, [], "v"
+        model, num_thread, ready, voices, default_voice, generation = "m", None, False, [], "v", 0
 
     for error, status in ((EngineError("too long", 413), 413), (RuntimeError("boom"), 500)):
         assert client(Broken()).post("/v1/speak", json=BODY).status_code == status
