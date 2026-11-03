@@ -23,7 +23,7 @@ In `.env` next to `docker-compose.yml`:
 
 On the **Settings** card of `/admin/` (saved in `settings.json` beside the tokens, shared by all replicas; a saved
 value beats the environment variable named in brackets): update check hours (`TTSPARADEE_UPDATE_CHECK_HOURS`, 6),
-in-flight cap (`TTSPARADEE_MAX_INFLIGHT`, 0 = 4), Paradee version (`TTSPARADEE_VERSION`, restart; `1.2` has four voices, `1.1` and `1.0` only `af_heart`) and load at start (`TTSPARADEE_WARM`, restart). Compose does not pass these;
+in-flight cap (`TTSPARADEE_MAX_INFLIGHT`, 0 = 4), answers kept per replica (`TTSPARADEE_CACHE_SIZE`, 64, 0 = off; at most 1 MB each), Paradee version (`TTSPARADEE_VERSION`, restart; `1.2` has four voices, `1.1` and `1.0` only `af_heart`) and load at start (`TTSPARADEE_WARM`, restart). Compose does not pass these;
 add the variable under `environment:` of `ttsparadee` to use one as a starting value.
 
 ## Start

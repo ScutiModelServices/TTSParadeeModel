@@ -15,11 +15,12 @@ from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import PlainTextResponse, Response
+from fastapi.responses import PlainTextResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, Field
 
+from audio import AudioCache, wav_bytes, wav_header
 from engine import DEFAULT_VERSION, EngineError, ParadeeEngine, default_marker
 from options import SETTINGS
 import settings
@@ -37,6 +38,7 @@ class SpeakRequest(BaseModel):
     text: str = Field(min_length=1, max_length=5000)
     voice: str | None = Field(None, pattern=NAME_PATTERN)
     speed: float = Field(1.0, ge=0.5, le=2.0)  # above 1 speaks faster
+    stream: bool = False  # true: the WAV is sent sentence by sentence, so audio starts sooner; its header has no length
 
 
 class SettingsUpdate(BaseModel):
@@ -62,15 +64,22 @@ class Threads(BaseModel):
 def create_app(client: ParadeeEngine | None = None, admin_password: str | None = None,
                tokens: TokenStore | None = None, warm: bool = False,
                updates: Updates | None = None, check_hours: float = 0, max_inflight: int | None = None,
-               config: settings.Config | None = None) -> FastAPI:
+               cache_size: int | None = None, config: settings.Config | None = None) -> FastAPI:
     """`admin_password` (TTSPARADEE_ADMIN_PASSWORD) unlocks /admin/, where each caller gets a token of its own; when it
     is set, every call except /health must send one of those tokens in the X-Internal-Token header. Unset = no
-    auth at all (local use only). `tokens` holds the tokens (TTSPARADEE_TOKENS_FILE). `config` (the admin page's
-    settings) replaces `warm`, `check_hours` and `max_inflight` and keeps them live; without it they stay fixed."""
+    auth at all (local use only). `tokens` holds the tokens (TTSPARADEE_TOKENS_FILE). `cache_size` > 0 keeps that
+    many answers per replica (TTSPARADEE_CACHE_SIZE). `config` (the admin page's settings) replaces `warm`,
+    `check_hours`, `max_inflight` and `cache_size` and keeps them live; without it they stay fixed."""
     tokens = tokens or TokenStore(os.environ.get("TTSPARADEE_TOKENS_FILE", "tokens.json"))
     client = client or ParadeeEngine(config.get("version") if config else os.environ.get("TTSPARADEE_VERSION", DEFAULT_VERSION),
                                    marker=default_marker())
     inflight = 0
+    cache = AudioCache()
+
+    def cache_limit() -> int:
+        """Answers this replica keeps; 0 = off."""
+        return config.get("cache_size") if config else (
+            cache_size if cache_size is not None else int(os.environ.get("TTSPARADEE_CACHE_SIZE") or 0))
 
     def inflight_limit() -> int:
         """Calls this replica lets wait for the model at once; more get 429. 0 = 4."""
@@ -179,18 +188,58 @@ def create_app(client: ParadeeEngine | None = None, admin_password: str | None =
 
     @app.post("/v1/speak")
     async def speak(body: SpeakRequest, allowed: list[str] | None = Depends(authorize), _slot: None = Depends(slot)) -> Response:
-        check_scope(allowed, body.voice or client.default_voice)
+        name = body.voice or client.default_voice
+        check_scope(allowed, name)
         started = time.perf_counter()
+        size = cache_limit()
+        key = (client.generation, name, body.speed, body.text)
+        audio = cache.get(key, size)
+        if audio is not None:
+            return wav_reply(audio, started, "hit")
         try:
+            if body.stream:
+                return await stream_reply(body, name, key, size)
             audio = await client.synthesize(body.text, body.voice, body.speed)
         except EngineError as error:
             raise HTTPException(error.status or 500, str(error)) from None
         except Exception:
             _log.exception("Paradee could not speak")
             raise HTTPException(500, "Paradee could not speak") from None
+        cache.put(key, audio, size)
+        return wav_reply(audio, started, "miss")
+
+    def wav_reply(audio: dict[str, Any], started: float, cached: str) -> Response:
         return Response(audio["wav"], media_type="audio/wav", headers={
-            "X-Audio-Seconds": f"{audio['seconds']:.3f}", "X-Voice": audio["voice"],
+            "X-Audio-Seconds": f"{audio['seconds']:.3f}", "X-Voice": audio["voice"], "X-Cache": cached,
             "X-Duration-Ms": str(round((time.perf_counter() - started) * 1000))})
+
+    async def stream_reply(body: SpeakRequest, name: str, key: tuple, size: int) -> StreamingResponse:
+        """Starts the audio before the text is finished. The first sentence is made here, so an unknown voice or a
+        failed model still gives a proper HTTP error; once the stream has begun an error can only cut it off."""
+        pieces = client.stream(body.text, name, body.speed)
+        try:
+            rate, first = await anext(pieces)
+        except BaseException:
+            await pieces.aclose()
+            raise
+
+        async def chunks():
+            kept: bytearray | None = bytearray(first) if size else None
+            try:
+                yield wav_header(rate)
+                yield first
+                async for _, piece in pieces:
+                    if kept is not None:
+                        kept += piece
+                        if len(kept) > cache.MAX_BYTES:
+                            kept = None  # too long to keep; stop collecting it
+                    yield piece
+            finally:
+                await pieces.aclose()
+            if kept is not None:  # only a stream that reached its end
+                cache.put(key, {"wav": wav_bytes(bytes(kept), rate), "seconds": len(kept) / 2 / rate, "voice": name}, size)
+
+        return StreamingResponse(chunks(), media_type="audio/wav", headers={"X-Voice": name, "X-Cache": "miss"})
 
     @app.put("/admin/threads", dependencies=[Depends(admin)])
     def set_threads(body: Threads) -> dict[str, Any]:
