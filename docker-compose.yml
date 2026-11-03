@@ -1,0 +1,46 @@
+# TTSParadee service: N API replicas behind one nginx address. Each replica runs the model in its own process,
+# so RAM use is per replica; the downloaded weights are shared through the models volume.
+# Start:  docker compose up -d --build          (callers use http://<host>:9160)
+# Scale:  TTSPARADEE_REPLICAS=3 docker compose up -d --build, then: docker compose restart ttsparadee_lb
+
+name: ttsparadee
+
+services:
+  ttsparadee:
+    build: .
+    restart: unless-stopped
+    environment:
+      TTSPARADEE_ADMIN_PASSWORD: ${TTSPARADEE_ADMIN_PASSWORD:-}
+      TTSPARADEE_NUM_THREAD: ${TTSPARADEE_NUM_THREAD:-}
+      TTSPARADEE_REPLICAS: ${TTSPARADEE_REPLICAS:-1}  # shown read-only on /admin/
+    volumes:
+      - models:/models
+      - tokens:/data
+    deploy:
+      replicas: ${TTSPARADEE_REPLICAS:-1}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9160/health')"]
+      interval: 15s
+      timeout: 5s
+      start_period: 300s
+    networks: [ttsparadee]
+
+  ttsparadee_lb:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "${TTSPARADEE_PORT:-9160}:9160"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      ttsparadee:
+        condition: service_healthy
+    networks: [ttsparadee]
+
+volumes:
+  models:
+  tokens:
+
+networks:
+  # Other stacks reach http://ttsparadee_lb:9160 by joining this network.
+  ttsparadee:
