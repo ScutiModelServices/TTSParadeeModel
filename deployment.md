@@ -19,7 +19,7 @@ In `.env` next to `docker-compose.yml`:
 | `TTSPARADEE_REPLICAS` | `1` | Number of `ttsparadee` containers. Read by Compose. |
 | `TTSPARADEE_PORT` | `9160` | Host port `ttsparadee_lb` publishes. |
 | `TTSPARADEE_ADMIN_PASSWORD` | empty | Password for `/admin/`. When set, every call except `/health` must send a token as `X-Internal-Token`. Empty = no auth. |
-| `TTSPARADEE_NUM_THREAD` | onnxruntime decides | Starting value for the CPU threads card; a value saved on `/admin/` wins. |
+| `TTSPARADEE_NUM_THREAD` | onnxruntime decides | Starting value for the CPU threads card; a value saved on `/admin/` wins. Use the number of physical cores (`lscpu`: cores x sockets), not logical CPUs; more threads than cores slows every call. |
 
 On the **Settings** card of `/admin/` (saved in `settings.json` beside the tokens, shared by all replicas; a saved
 value beats the environment variable named in brackets): update check hours (`TTSPARADEE_UPDATE_CHECK_HOURS`, 6),

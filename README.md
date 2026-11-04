@@ -43,7 +43,7 @@ are voice names). A token without a list may use every served voice.
 `/admin/` (password `TTSPARADEE_ADMIN_PASSWORD`): tokens with voice scope, rate limit and expiry, usage numbers, CPU
 threads, the Settings card (update check hours, in-flight cap, answers kept, Paradee version, load at start), and the Updates card (**Check now** and **Download new weights**).
 New files are downloaded once into the shared models volume; the other replicas notice within a few seconds and
-load them on their next request. `/metrics` (admin password) is Prometheus text per token.
+load them on their next request. `/metrics` (admin password) is Prometheus text per token. `ttsparadee_request_seconds` is a histogram of how long each `/v1` call took on the replica that answers (to the first byte for a streamed reply); it starts from 0 when the replica restarts.
 
 ## Run
 
