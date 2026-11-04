@@ -5,7 +5,7 @@ REM DESCRIPTION: Shared HTTP service that runs Paradee text to speech on the CPU
 
 cd /d "%~dp0"
 
-python -m uv sync
+uv sync
 if errorlevel 1 (
     echo uv sync failed. Install uv: winget install astral-sh.uv
     pause
