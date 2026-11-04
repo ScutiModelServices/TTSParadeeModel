@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Docs: set CPU threads to the number of physical cores, not logical CPUs.
+- `/metrics` also returns `ttsparadee_request_seconds`, a histogram of how long `/v1` calls took on that replica.
+
 - Answer cache: the last answers for the same text, voice and speed are sent again without speaking (`TTSPARADEE_CACHE_SIZE`, default 64, 0 = off; `X-Cache` header).
 - `POST /v1/speak` accepts `"stream": true`: the WAV is sent sentence by sentence, so the first audio arrives sooner.
 - `tools/bench.py` varies the speed per run (to skip the cache) and has `--stream`.
