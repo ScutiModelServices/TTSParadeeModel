@@ -70,9 +70,17 @@ uv run pytest
 - There is no streaming: the whole clip is generated, then sent.
 - The update check follows the release tag the `paradee` package pins (`v1.2`), so it reports a change only when the author moves that tag.
 
-
 ## Try it from the admin page
 
 Open `/admin/` and use **Try it** to call the public API with a service token held only in memory. Runs use normal token scopes, limits and caches; the panel shows HTTP status, latency, responses, cancellation and a curl equivalent with a token placeholder. See [the web UI guide](docs/guide-web-ui.md#try-it-send-a-real-request).
 
 Speak sends text, an installed voice and speed to `POST /v1/speak`, then displays WAV audio with playback controls and a download. Load voices with the public token: `GET /v1/voices` is filtered by its allowed projects list, which represents voice names for TTS. The installed Paradee version determines the available voices. An optional streaming request receives WAV chunks; the player is created when the bounded audio response finishes.
+
+## Documentation
+
+- [Purpose: input, output and what it is for](docs/purpose.md)
+- [Deployment](deployment.md)
+- [Changelog](CHANGELOG.md)
+- [Docker on another machine](docs/guide-docker-deployment-device.md)
+- [Docker on this PC](docs/guide-docker-same-device.md)
+- [Run without Docker](docs/guide-no-docker-same-device.md)
