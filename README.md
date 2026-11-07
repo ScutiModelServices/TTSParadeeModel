@@ -25,7 +25,7 @@ its size fields are `0xFFFFFFFF` (read "until the connection ends"), and there i
 text, model not loaded) are still normal HTTP errors; one after the first sentence cuts the stream off. Without
 `stream` the reply is the complete file with its length.
 
-**Cache.** The *Answers kept per replica* setting (`TTSPARADEE_CACHE_SIZE`, default 64, 0 = off) keeps the last answers for
+**Cache.** The *Answers kept per replica* setting (`SERVICE_CACHE_SIZE`, default 64, 0 = off) keeps the last answers for
 the same text, voice and speed; a repeat is sent again without speaking (`X-Cache: hit`, a few milliseconds). An
 answer over 1 MB (about 20 seconds of audio) is not kept, so 64 entries use at most 64 MB per replica. The cache is
 per replica, so with N replicas the hit rate is about 1/N, and it is emptied when the voices are reloaded
@@ -40,7 +40,7 @@ are voice names). A token without a list may use every served voice.
 
 ## Admin page
 
-`/admin/` (password `TTSPARADEE_ADMIN_PASSWORD`): tokens with voice scope, rate limit and expiry, usage numbers, CPU
+`/admin/` (password `SERVICE_ADMIN_PASSWORD`): tokens with voice scope, rate limit and expiry, usage numbers, CPU
 threads, the Settings card (update check hours, in-flight cap, answers kept, Paradee version, load at start), and the Updates card (**Check now** and **Download new weights**).
 New files are downloaded once into the shared models volume; the other replicas notice within a few seconds and
 load them on their next request. `/metrics` (admin password) is Prometheus text per token. `ttsparadee_request_seconds` is a histogram of how long each `/v1` call took on the replica that answers (to the first byte for a streamed reply); it starts from 0 when the replica restarts.
@@ -53,7 +53,7 @@ python tools/bench.py http://127.0.0.1:29321 --save out
 ```
 
 Without Docker: `run.bat` (uv, listens on `127.0.0.1:29321`). The first start downloads 8.5 MB plus the phonemizer data. Memory:
-about 650 MB per replica, measured with both phonemizers loaded, so `TTSPARADEE_REPLICAS` multiplies it. See `deployment.md`.
+about 650 MB per replica, measured with both phonemizers loaded, so `SERVICE_REPLICAS` multiplies it. See `deployment.md`.
 
 ## Tests
 

@@ -5,7 +5,7 @@ Run Paradee text to speech on the CPU in Docker Desktop on the machine you work 
 ## Requirements
 
 - Docker Desktop with Compose v2 (Windows: WSL2 backend).
-- RAM per replica: about 650 MB (measured on Windows; each replica loads its own copy). Keep `TTSPARADEE_REPLICAS=1` on a PC. Docker Desktop on Windows caps its engine at about half of your RAM unless you raise it in `.wslconfig`.
+- RAM per replica: about 650 MB (measured on Windows; each replica loads its own copy). Keep `SERVICE_REPLICAS=1` on a PC. Docker Desktop on Windows caps its engine at about half of your RAM unless you raise it in `.wslconfig`.
 - Network access on the first start to download the files (8.5 MB plus the phonemizer data) from Hugging Face.
 - CPU only, no GPU needed.
 
@@ -15,7 +15,7 @@ Run Paradee text to speech on the CPU in Docker Desktop on the machine you work 
    ```bash
    cp .env.example .env
    ```
-   Set `TTSPARADEE_ADMIN_PASSWORD` (empty = no auth and no admin page, fine for a local test). Leave `TTSPARADEE_PORT=29321`. Leave `TTSPARADEE_REPLICAS=1`.
+   Set `SERVICE_ADMIN_PASSWORD` (empty = no auth and no admin page, fine for a local test). Leave `SERVICE_PORT=29321`. Leave `SERVICE_REPLICAS=1`.
 2. Start:
    ```bash
    docker compose up -d --build
@@ -43,14 +43,14 @@ In `.env` next to `docker-compose.yml`:
 
 | Variable | Default | Effect |
 |---|---|---|
-| `TTSPARADEE_REPLICAS` | `1` | Number of `tts_paradee_model` containers. Read by Compose. |
-| `TTSPARADEE_PORT` | `29321` | Host port `tts_paradee_model_lb` publishes. |
-| `TTSPARADEE_ADMIN_PASSWORD` | empty | Password for `/admin/`. When set, every call except `/health` must send a token as `X-Internal-Token`. Empty = no auth. |
-| `TTSPARADEE_NUM_THREAD` | onnxruntime decides | Starting value for the CPU threads card; a value saved on `/admin/` wins. Use the number of physical cores (`lscpu`: cores x sockets), not logical CPUs; more threads than cores slows every call. |
+| `SERVICE_REPLICAS` | `1` | Number of `tts_paradee_model` containers. Read by Compose. |
+| `SERVICE_PORT` | `29321` | Host port `tts_paradee_model_lb` publishes. |
+| `SERVICE_ADMIN_PASSWORD` | empty | Password for `/admin/`. When set, every call except `/health` must send a token as `X-Internal-Token`. Empty = no auth. |
+| `SERVICE_NUM_THREAD` | onnxruntime decides | Starting value for the CPU threads card; a value saved on `/admin/` wins. Use the number of physical cores (`lscpu`: cores x sockets), not logical CPUs; more threads than cores slows every call. |
 
 On the **Settings** card of `/admin/` (saved in `settings.json` beside the tokens, shared by all replicas; a saved
-value beats the environment variable named in brackets): update check hours (`TTSPARADEE_UPDATE_CHECK_HOURS`, 6),
-in-flight cap (`TTSPARADEE_MAX_INFLIGHT`, 0 = 4), answers kept per replica (`TTSPARADEE_CACHE_SIZE`, 64, 0 = off; at most 1 MB each), Paradee version (`TTSPARADEE_VERSION`, restart; `1.2` has four voices, `1.1` and `1.0` only `af_heart`) and load at start (`TTSPARADEE_WARM`, restart). Compose does not pass these;
+value beats the environment variable named in brackets): update check hours (`SERVICE_UPDATE_CHECK_HOURS`, 6),
+in-flight cap (`SERVICE_MAX_INFLIGHT`, 0 = 4), answers kept per replica (`SERVICE_CACHE_SIZE`, 64, 0 = off; at most 1 MB each), Paradee version (`SERVICE_VERSION`, restart; `1.2` has four voices, `1.1` and `1.0` only `af_heart`) and load at start (`SERVICE_WARM`, restart). Compose does not pass these;
 add the variable under `environment:` of `tts_paradee_model` to use one as a starting value.
 
 ## Daily use
@@ -74,12 +74,12 @@ python tools/bench.py http://127.0.0.1:29321 --save out
 
 | Symptom | Fix |
 |---|---|
-| `address already in use` on 29321 | Another copy (`run.bat`, or the same stack on another compose project) is running. Stop it or change `TTSPARADEE_PORT`. |
+| `address already in use` on 29321 | Another copy (`run.bat`, or the same stack on another compose project) is running. Stop it or change `SERVICE_PORT`. |
 | `/health` shows `ready: false` for minutes | First start: the weights are downloading or loading. Check `docker compose logs -f tts_paradee_model`. |
 | 401 Invalid token | The caller's token is missing or revoked; make one on `/admin/`. |
 | Container restarts in a loop | Out of RAM. Raise the Docker Desktop memory limit or lower the replica count. |
 | `tts_paradee_model_lb` never starts | No replica is healthy yet (first download, or out of memory). `docker compose logs tts_paradee_model`. |
-| Replicas restart in a loop | Out of RAM. Lower `TTSPARADEE_REPLICAS`. |
+| Replicas restart in a loop | Out of RAM. Lower `SERVICE_REPLICAS`. |
 | 403 "may not use voice" | The token's list on `/admin/` does not include that voice (or the default voice, when `voice` is left out). |
 | 404 on `/v1/speak` | The voice is not served here. `GET /v1/voices` lists them. |
 | 422 on `format` or another field | Only `text`, `voice` and `speed` exist; the reply is always WAV. |

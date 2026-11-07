@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+### Breaking: common service environment variables
+
+Service-owned environment variables now use `SERVICE_*`. Old names are no longer read.
+Rename old names once in your real `.env`, Compose `environment:` block, and CI/secret settings.
+
+| Old name | New name |
+|---|---|
+| `TTSPARADEE_ADMIN_PASSWORD` | `SERVICE_ADMIN_PASSWORD` |
+| `TTSPARADEE_CACHE_SIZE` | `SERVICE_CACHE_SIZE` |
+| `TTSPARADEE_HOST` | `SERVICE_HOST` |
+| `TTSPARADEE_MAX_INFLIGHT` | `SERVICE_MAX_INFLIGHT` |
+| `TTSPARADEE_NUM_THREAD` | `SERVICE_NUM_THREAD` |
+| `TTSPARADEE_PORT` | `SERVICE_PORT` |
+| `TTSPARADEE_REPLICAS` | `SERVICE_REPLICAS` |
+| `TTSPARADEE_TOKENS_FILE` | `SERVICE_TOKENS_FILE` |
+| `TTSPARADEE_UPDATE_CHECK_HOURS` | `SERVICE_UPDATE_CHECK_HOURS` |
+| `TTSPARADEE_VERSION` | `SERVICE_VERSION` |
+| `TTSPARADEE_WARM` | `SERVICE_WARM` |
+| `TTSPARADEE_WEB_DIR` | `SERVICE_WEB_DIR` |
+| `TTSPARADEE_WEIGHTS_MARKER` | `SERVICE_WEIGHTS_MARKER` |
+
 - Move the default service port from 9160 to 29321, including API replicas and the nginx load balancer. Update any explicit old port in your real `.env`, saved tool-service `backends.json` connections, and browser or MCP client configuration once. With Compose defaults, recreate the stack to use the new host and container ports; a custom host-port override stays as configured, while container ports still change to 29321.
 
 - Renamed `TTSParadeeModel` to `TTS_Paradee_Model`; Docker project, API image, services, load balancer and volumes now use `tts_paradee_model` names. Callers on `citadel_core` connect to `tts_paradee_model_lb` at the existing port.
@@ -21,7 +42,7 @@
 - Docs: set CPU threads to the number of physical cores, not logical CPUs.
 - `/metrics` also returns `ttsparadee_request_seconds`, a histogram of how long `/v1` calls took on that replica.
 
-- Answer cache: the last answers for the same text, voice and speed are sent again without speaking (`TTSPARADEE_CACHE_SIZE`, default 64, 0 = off; `X-Cache` header).
+- Answer cache: the last answers for the same text, voice and speed are sent again without speaking (`SERVICE_CACHE_SIZE`, default 64, 0 = off; `X-Cache` header).
 - `POST /v1/speak` accepts `"stream": true`: the WAV is sent sentence by sentence, so the first audio arrives sooner.
 - `tools/bench.py` varies the speed per run (to skip the cache) and has `--stream`.
 - First version: Paradee text to speech, an 8M-parameter model distilled from Kokoro-82M (Apache 2.0) served on the CPU, with the admin page, tokens (scope, rate limit, expiry), metrics,
