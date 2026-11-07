@@ -1,6 +1,6 @@
 # TTS_Paradee_Model: without Docker, on Windows
 
-Run Paradee text to speech on the CPU directly with Python: one process, no load balancer, listening on `127.0.0.1:9160`.
+Run Paradee text to speech on the CPU directly with Python: one process, no load balancer, listening on `127.0.0.1:29321`.
 
 ## Requirements
 - Windows with Python 3.11 or newer and uv (`winget install astral-sh.uv`).
@@ -24,7 +24,7 @@ uv run python src/app.py
 | Variable | Default | Effect |
 |---|---|---|
 | `TTSPARADEE_HOST` | `127.0.0.1` | Bind address. Use `0.0.0.0` only if other devices must reach it. |
-| `TTSPARADEE_PORT` | `9160` | Port. |
+| `TTSPARADEE_PORT` | `29321` | Port. |
 | `TTSPARADEE_ADMIN_PASSWORD` | empty | Unlocks `/admin/` and requires tokens on every call but `/health`. Empty = no auth. |
 | `TTSPARADEE_WARM` | `1` | Load the model at start; with `0` the first request pays the load time. |
 | `TTSPARADEE_NUM_THREAD` | the library decides | CPU threads. Set it to the number of **physical** cores. |
@@ -34,16 +34,16 @@ Bash: `TTSPARADEE_ADMIN_PASSWORD=secret uv run python src/app.py`
 
 ## Check
 ```bash
-curl http://127.0.0.1:9160/health
+curl http://127.0.0.1:29321/health
 ```
-`ready` is `false` until the model has loaded. Then open `http://127.0.0.1:9160/admin/` (see [guide-web-ui.md](guide-web-ui.md)),
+`ready` is `false` until the model has loaded. Then open `http://127.0.0.1:29321/admin/` (see [guide-web-ui.md](guide-web-ui.md)),
 make a token, and try a call:
 ```bash
-curl -X POST http://127.0.0.1:9160/v1/speak -H "Content-Type: application/json" -H "X-Internal-Token: ttsparadee_..." -d '{"text":"Hello from the model service."}' -o hello.wav
+curl -X POST http://127.0.0.1:29321/v1/speak -H "Content-Type: application/json" -H "X-Internal-Token: ttsparadee_..." -d '{"text":"Hello from the model service."}' -o hello.wav
 ```
 
 ## Stop
-Ctrl+C in the terminal. Do not run this and the Docker stack together: both use port 9160.
+Ctrl+C in the terminal. Do not run this and the Docker stack together: both use port 29321.
 
 ## Tests
 `uv run pytest`.

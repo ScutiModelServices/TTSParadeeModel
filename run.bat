@@ -1,5 +1,5 @@
 @echo off
-REM Starts the ttsparadee service on port 9160 (syncs .venv with uv on each run). The first start downloads 8.5 MB plus the phonemizer data.
+REM Starts the ttsparadee service on port 29321 (syncs .venv with uv on each run). The first start downloads 8.5 MB plus the phonemizer data.
 REM LABEL: TTSParadee Service
 REM DESCRIPTION: Shared HTTP service that runs Paradee text to speech on the CPU for every project.
 cd /d "%~dp0"

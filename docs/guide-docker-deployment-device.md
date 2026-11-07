@@ -34,7 +34,7 @@ cd /media/ZimaOS-HD/Apps/TTS_Paradee_Model
 Create `.env` (deploy option 2 copies yours, or `cp .env.example .env` and edit):
 - `TTSPARADEE_ADMIN_PASSWORD`: a real password.
 - `TTSPARADEE_REPLICAS=1` unless you have the memory for more.
-- `TTSPARADEE_PORT=9160` (published on all interfaces; firewall it if the LAN should not reach it, or bind it to
+- `TTSPARADEE_PORT=29321` (published on all interfaces; firewall it if the LAN should not reach it, or bind it to
   `127.0.0.1` in the `ports:` line of `tts_paradee_model_lb` when only callers on the machine need it).
 
 ## 3. Start
@@ -42,21 +42,21 @@ Create `.env` (deploy option 2 copies yours, or `cp .env.example .env` and edit)
 ```bash
 docker compose up -d --build
 docker compose ps
-curl http://127.0.0.1:9160/health
+curl http://127.0.0.1:29321/health
 ```
 The first start downloads 8.5 MB of model files plus the phonemizer data into the `tts_paradee_model_models` volume; `tts_paradee_model_lb` waits for a healthy service
 (up to 300 s grace).
 
 ## 4. Connect callers
 
-1. Open `http://<machine-ip>:9160/admin/`, sign in with the admin password and create one token per caller
+1. Open `http://<machine-ip>:29321/admin/`, sign in with the admin password and create one token per caller
    (see [guide-web-ui.md](guide-web-ui.md)).
 2. The caller holds the URL and token:
-   - Caller on another machine: `http://<machine-ip>:9160`.
-   - Caller in a Docker stack on the same machine: `http://host.docker.internal:9160`.
+   - Caller on another machine: `http://<machine-ip>:29321`.
+   - Caller in a Docker stack on the same machine: `http://host.docker.internal:29321`.
 3. Try a call from the machine:
    ```bash
-   curl -X POST http://127.0.0.1:9160/v1/speak -H "Content-Type: application/json" -H "X-Internal-Token: ttsparadee_..." -d '{"text":"Hello from the model service."}' -o hello.wav
+   curl -X POST http://127.0.0.1:29321/v1/speak -H "Content-Type: application/json" -H "X-Internal-Token: ttsparadee_..." -d '{"text":"Hello from the model service."}' -o hello.wav
    ```
 
 ## Scaling
@@ -87,7 +87,7 @@ A plain publish (`run.bat`, Deploy, option 1) only updates the `live` branch. Fo
 
 | Symptom | Fix |
 |---|---|
-| Caller cannot reach the service | Check the caller's URL and token, and that `curl http://<machine-ip>:9160/health` works. |
+| Caller cannot reach the service | Check the caller's URL and token, and that `curl http://<machine-ip>:29321/health` works. |
 | nginx 502 after an update | `docker compose restart tts_paradee_model_lb`. |
 | Permission denied on push | run.bat Deploy option 6. |
-| Port 9160 in use | Another stack on the machine already publishes it. |
+| Port 29321 in use | Another stack on the machine already publishes it. |

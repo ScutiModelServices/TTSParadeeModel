@@ -1,6 +1,6 @@
 # TTS_Paradee_Model
 
-Paradee text to speech served over HTTP, behind the shared model-service admin page, tokens and settings. Port 9160, env prefix `TTSPARADEE_`, token prefix `ttsparadee_`.
+Paradee text to speech served over HTTP, behind the shared model-service admin page, tokens and settings. Port 29321, env prefix `TTSPARADEE_`, token prefix `ttsparadee_`.
 
 ## Agent instructions
 This file is the one instruction file for every coding agent; `CLAUDE.md` only imports it (`@AGENTS.md`). Edit this file, never `CLAUDE.md`.

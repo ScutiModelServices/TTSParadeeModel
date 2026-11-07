@@ -1,7 +1,7 @@
 # Deploying TTS_Paradee_Model
 
-TTS_Paradee_Model is one HTTP service (port 9160). It runs as `tts_paradee_model` replicas behind an nginx load balancer,
-`tts_paradee_model_lb`. Callers use `http://<host>:9160`; they never reach a replica directly.
+TTS_Paradee_Model is one HTTP service (port 29321). It runs as `tts_paradee_model` replicas behind an nginx load balancer,
+`tts_paradee_model_lb`. Callers use `http://<host>:29321`; they never reach a replica directly.
 
 ## Ways to run it
 

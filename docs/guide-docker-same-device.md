@@ -15,7 +15,7 @@ Run Paradee text to speech on the CPU in Docker Desktop on the machine you work 
    ```bash
    cp .env.example .env
    ```
-   Set `TTSPARADEE_ADMIN_PASSWORD` (empty = no auth and no admin page, fine for a local test). Leave `TTSPARADEE_PORT=9160`. Leave `TTSPARADEE_REPLICAS=1`.
+   Set `TTSPARADEE_ADMIN_PASSWORD` (empty = no auth and no admin page, fine for a local test). Leave `TTSPARADEE_PORT=29321`. Leave `TTSPARADEE_REPLICAS=1`.
 2. Start:
    ```bash
    docker compose up -d --build
@@ -24,18 +24,18 @@ Run Paradee text to speech on the CPU in Docker Desktop on the machine you work 
    (up to 300 s grace). Watch with `docker compose ps` and `docker compose logs -f tts_paradee_model`.
 3. Check:
    ```bash
-   curl http://127.0.0.1:9160/health
+   curl http://127.0.0.1:29321/health
    ```
    `ready` is `false` until the model has loaded, then `true`.
-4. Open the admin page: `http://127.0.0.1:9160/admin/` (see [guide-web-ui.md](guide-web-ui.md)) and make a token for each caller.
+4. Open the admin page: `http://127.0.0.1:29321/admin/` (see [guide-web-ui.md](guide-web-ui.md)) and make a token for each caller.
 5. Try a call:
    ```bash
-   curl -X POST http://127.0.0.1:9160/v1/speak -H "Content-Type: application/json" -H "X-Internal-Token: ttsparadee_..." -d '{"text":"Hello from the model service."}' -o hello.wav
+   curl -X POST http://127.0.0.1:29321/v1/speak -H "Content-Type: application/json" -H "X-Internal-Token: ttsparadee_..." -d '{"text":"Hello from the model service."}' -o hello.wav
    ```
    Expect a WAV file, `hello.wav`.
 6. Callers connect to the published port. The caller holds the URL and token:
-   - Caller on the host: `http://127.0.0.1:9160`.
-   - Caller in another Docker stack on the same host: `http://host.docker.internal:9160`.
+   - Caller on the host: `http://127.0.0.1:29321`.
+   - Caller in another Docker stack on the same host: `http://host.docker.internal:29321`.
 
 ## Settings
 
@@ -44,7 +44,7 @@ In `.env` next to `docker-compose.yml`:
 | Variable | Default | Effect |
 |---|---|---|
 | `TTSPARADEE_REPLICAS` | `1` | Number of `tts_paradee_model` containers. Read by Compose. |
-| `TTSPARADEE_PORT` | `9160` | Host port `tts_paradee_model_lb` publishes. |
+| `TTSPARADEE_PORT` | `29321` | Host port `tts_paradee_model_lb` publishes. |
 | `TTSPARADEE_ADMIN_PASSWORD` | empty | Password for `/admin/`. When set, every call except `/health` must send a token as `X-Internal-Token`. Empty = no auth. |
 | `TTSPARADEE_NUM_THREAD` | onnxruntime decides | Starting value for the CPU threads card; a value saved on `/admin/` wins. Use the number of physical cores (`lscpu`: cores x sockets), not logical CPUs; more threads than cores slows every call. |
 
@@ -67,14 +67,14 @@ docker compose up -d --build && docker compose restart tts_paradee_model_lb   # 
 Try it and time it:
 
 ```bash
-python tools/bench.py http://127.0.0.1:9160 --save out
+python tools/bench.py http://127.0.0.1:29321 --save out
 ```
 
 ## Problems
 
 | Symptom | Fix |
 |---|---|
-| `address already in use` on 9160 | Another copy (`run.bat`, or the same stack on another compose project) is running. Stop it or change `TTSPARADEE_PORT`. |
+| `address already in use` on 29321 | Another copy (`run.bat`, or the same stack on another compose project) is running. Stop it or change `TTSPARADEE_PORT`. |
 | `/health` shows `ready: false` for minutes | First start: the weights are downloading or loading. Check `docker compose logs -f tts_paradee_model`. |
 | 401 Invalid token | The caller's token is missing or revoked; make one on `/admin/`. |
 | Container restarts in a loop | Out of RAM. Raise the Docker Desktop memory limit or lower the replica count. |
@@ -86,4 +86,4 @@ python tools/bench.py http://127.0.0.1:9160 --save out
 | 429 | Over the token's rate limit, or too many calls waiting for the model. |
 | nginx 502 after scaling | `tts_paradee_model_lb` not restarted after the replica count changed. |
 
-The load balancer also joins external `citadel_core` as `tts_paradee_model_lb`. Start the Citadel stack first so that network exists; tool services on it use `http://tts_paradee_model_lb:9160`. Docker project and API image are `tts_paradee_model` and `tts_paradee_model:latest`; persistent volumes have explicit `tts_paradee_model_*` names. Volume migration and rollback instructions are in [CHANGELOG.md](../CHANGELOG.md).
+The load balancer also joins external `citadel_core` as `tts_paradee_model_lb`. Start the Citadel stack first so that network exists; tool services on it use `http://tts_paradee_model_lb:29321`. Docker project and API image are `tts_paradee_model` and `tts_paradee_model:latest`; persistent volumes have explicit `tts_paradee_model_*` names. Volume migration and rollback instructions are in [CHANGELOG.md](../CHANGELOG.md).

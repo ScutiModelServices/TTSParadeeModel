@@ -1,6 +1,6 @@
 # TTSParadee service: N API replicas behind one nginx address. Each replica runs the model in its own process,
 # so RAM use is per replica; the downloaded weights are shared through the models volume.
-# Start:  docker compose up -d --build          (callers use http://<host>:9160)
+# Start:  docker compose up -d --build          (callers use http://<host>:29321)
 # Scale:  TTSPARADEE_REPLICAS=3 docker compose up -d --build, then: docker compose restart tts_paradee_model_lb
 
 name: tts_paradee_model
@@ -20,7 +20,7 @@ services:
     deploy:
       replicas: ${TTSPARADEE_REPLICAS:-1}
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9160/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:29321/health')"]
       interval: 15s
       timeout: 5s
       start_period: 300s
@@ -31,7 +31,7 @@ services:
     image: nginx:1.27-alpine
     restart: unless-stopped
     ports:
-      - "${TTSPARADEE_PORT:-9160}:9160"
+      - "${TTSPARADEE_PORT:-29321}:29321"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
@@ -48,7 +48,7 @@ volumes:
   tts_paradee_model_data:
     name: tts_paradee_model_data
 networks:
-  # Other stacks reach http://tts_paradee_model_lb:9160 by joining this network.
+  # Other stacks reach http://tts_paradee_model_lb:29321 by joining this network.
   tts_paradee_model:
     name: tts_paradee_model
   citadel:
