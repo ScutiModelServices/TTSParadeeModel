@@ -8,7 +8,7 @@ Run Paradee text to speech on the CPU directly with Python: one process, no load
 - RAM for the model (one copy).
 
 ## Start
-Double-click `run.bat`, or run it in a terminal from `TTSParadeeModel\`. It runs `uv sync` to create or update `.venv`, then starts
+Double-click `run.bat`, or run it in a terminal from `TTSParadeeModel\`. Choose **1 Run the service** in the menu, or run `run.bat run` to skip the menu. It runs `uv sync` to create or update `.venv`, then starts
 `python src/app.py`. The first start downloads 8.5 MB of model files plus the phonemizer data.
 
 Linux or macOS:
