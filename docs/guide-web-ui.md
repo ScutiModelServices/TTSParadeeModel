@@ -1,4 +1,4 @@
-# TTSParadeeModel: the admin web UI
+# TTS_Paradee_Model: the admin web UI
 
 One page, `/admin/`, for tokens and CPU threads. It is the same for every way of running the service (Docker
 on the same device, Docker on a deployment device, no Docker). Only the address differs:
@@ -49,7 +49,7 @@ are approximate. Request counts are added to the file with that same write; uses
 counted in memory, so a crash can lose up to a minute of them. Old token files without the field still load and show **never** until next use. A companion
 `tokens.json.lock` file serializes updates across replicas without adding dependencies.
 
-Tokens live in `tokens.json` (`TTSPARADEE_TOKENS_FILE`). In Docker that is the `tokens` volume at `/data`, so they
+Tokens live in `tokens.json` (`TTSPARADEE_TOKENS_FILE`). In Docker that is the `tts_paradee_model_data` volume at `/data`, so they
 survive `docker compose down` and rebuilds. Without Docker it is `tokens.json` in the folder the service starts from.
 Tokens are enforced only while `TTSPARADEE_ADMIN_PASSWORD` is set.
 
@@ -73,7 +73,7 @@ The muted line says **Replicas: N. Change TTSPARADEE_REPLICAS in .env, then rebu
 page cannot change them. To change, set them in `.env`, then:
 ```bash
 docker compose up -d --build
-docker compose restart ttsparadee_lb
+docker compose restart tts_paradee_model_lb
 ```
 `unknown` means the variable is not set, which is normal without Docker. Without Docker there is one process.
 
@@ -110,7 +110,7 @@ The **Settings** card changes options without editing `.env` or restarting: upda
 The **Updates** card compares the downloaded revision of the Hugging Face repository with its newest one. **Download
 new weights** fetches them into the models volume; every replica drops its old copy within a few seconds and loads the
 new one on its next request. Updating the service itself: `docker compose up -d --build`, then
-`docker compose restart ttsparadee_lb`.
+`docker compose restart tts_paradee_model_lb`.
 
 ## Connect to this service
 

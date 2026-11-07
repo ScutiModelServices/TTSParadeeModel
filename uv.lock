@@ -2322,7 +2322,7 @@ wheels = [
 ]
 
 [[package]]
-name = "ttsparadee-service"
+name = "tts-paradee-model"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

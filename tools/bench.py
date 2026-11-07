@@ -2,7 +2,7 @@
 
 Sends the same sentences to /v1/speak and prints, per sentence, the wait, the audio length and how many times faster
 than real time it was. Each run uses a slightly different speed, so the answer cache never serves it.
-With --stream it asks for the audio sentence by sentence and also prints the wait for the first audio. Run it against TTSPiperModel and TTSParadeeModel with the same sentences to compare them.
+With --stream it asks for the audio sentence by sentence and also prints the wait for the first audio. Run it against TTS_Piper_Model and TTS_Paradee_Model with the same sentences to compare them.
 Uses only the standard library."""
 import argparse
 import json
